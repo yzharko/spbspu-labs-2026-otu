@@ -37,25 +37,24 @@ figure(2); hold on; grid on;
 figure(3); hold on; grid on;
 figure(4); hold on; grid on;
 
+U_step    = laplace(1, t, s);         
+U_imp = laplace(dirac(t), t, s);  
 
 for i = 1:numel(key_list)
     name  = key_list{i};
-    W     = W_sym_dict(name);      % sym — для ilaplace
-    W_check = W_tf_dict(name);       % tf с K0 — для step/impulse
+    W     = W_sym_dict(name);
+    W_check = W_tf_dict(name);
 
-    % аналитика
-    U_step = laplace(1, t, s);
-    h = ilaplace(W * U_step, s, t);
-    U_imp = laplace(dirac(t), t, s);
-    w = ilaplace(W * U_imp, s, t);
+    Y_step    = W * U_step;
+    h = ilaplace(Y_step, s, t);
+    Y_imp = W * U_imp;
+    w = ilaplace(Y_imp, s, t);
 
-    % графики h, w
     h_k = subs(h, K, K0);
     figure(1); plot(time, double(subs(h_k, t, time)), 'DisplayName', name);
     w_k = subs(w, K, K0);
     figure(2); plot(time, double(subs(w_k, t, time)), 'DisplayName', name);
 
-    % проверка step/impulse
     try
         figure(3); step(W_check, time);
     catch
@@ -79,8 +78,8 @@ K_values = 1:10;
 
 % --- h(t) для разных K ---
 figure(5); hold on; grid on;
-W_int = W_sym_dict("Интегрирующее");          % K/s (символьная)
-h_int = ilaplace(W_int * laplace(1,t,s), s, t);  % K*t
+W_int = W_sym_dict("Интегрирующее");     
+h_int = ilaplace(W_int * U_step, s, t); 
 
 for j = 1:numel(K_values)
     Kj = K_values(j);
@@ -93,7 +92,7 @@ legend('show','Location','northwest');
 
 % --- w(t) для разных K ---
 figure(6); hold on; grid on;
-w_int = ilaplace(W_int * laplace(dirac(t),t,s), s, t);  % K (константа)
+w_int = ilaplace(W_int * U_imp, s, t);
 
 for j = 1:numel(K_values)
     Kj = K_values(j);
