@@ -26,15 +26,15 @@ W_all = {K0/s, K0*s, tf(K0, 1), K0/(T0*s+1), ...
 plot_names = {'ЛАЧХ', 'ЛФЧХ', 'АФЧХ'};
 group_names = {'Исходные параметры', 'Влияние K', ...
     'Влияние T (для звеньев 5 и 6 — T1)', 'Влияние T2 (звенья 5 и 6)'};
-for g = 1:4
-    for p = 1:3
-        figure(3*(g-1)+p);
-        set(gcf, 'Name', [plot_names{p} ': ' group_names{g}], ...
+for groupIndex = 1:4
+    for plotIndex = 1:3
+        figure(3*(groupIndex-1)+plotIndex);
+        set(gcf, 'Name', [plot_names{plotIndex} ': ' group_names{groupIndex}], ...
             'NumberTitle', 'off', 'Position', [50 50 1400 850]);
     end
 end
 
-for n = 1:11 
+for n = 1:numel(W_all) 
     W = W_all{n};
     name = sprintf('%d. %s', n, names{n});
 
@@ -112,13 +112,13 @@ for n = 1:11
     end
 
 
-    for g = 1:numel(W_groups)
+    for groupIndex = 1:numel(W_groups)
         layout = [3 4 n];
-        if g == 4 
+        if groupIndex == 4 
             layout = [1 2 n-4];
         end
 
-        models = W_groups{g};
+        models = W_groups{groupIndex};
         colors = lines(numel(models));
         
         for i = 1:numel(models)
@@ -135,7 +135,7 @@ for n = 1:11
                 phase(gap) = NaN;
             end
 
-            figure(3*(g-1)+1);
+            figure(3*(groupIndex-1)+1);
             subplot(layout(1), layout(2), layout(3));
             semilogx(w, 20*log10(mag), 'Color', colors(i,:));
             hold on;
@@ -144,7 +144,7 @@ for n = 1:11
             xlabel('Частота, рад/с');
             ylabel('L, дБ');
 
-            figure(3*(g-1)+2);
+            figure(3*(groupIndex-1)+2);
             subplot(layout(1), layout(2), layout(3));
             semilogx(w, phase, 'Color', colors(i,:));
             hold on;
@@ -153,7 +153,7 @@ for n = 1:11
             xlabel('Частота, рад/с');
             ylabel('Фаза, град');
 
-            figure(3*(g-1)+3);
+            figure(3*(groupIndex-1)+3);
             subplot(layout(1), layout(2), layout(3));
             if n == 3 
                 plot(re, im, 'o', 'Color', colors(i,:));
@@ -168,9 +168,9 @@ for n = 1:11
         end
         
         for p = 1:3
-            figure(3*(g-1)+p);
+            figure(3*(groupIndex-1)+p);
             subplot(layout(1), layout(2), layout(3));
-            legend(labels_groups{g}, 'Location', 'best', 'FontSize', 6);
+            legend(labels_groups{groupIndex}, 'Location', 'best', 'FontSize', 6);
         end
     end
 end
