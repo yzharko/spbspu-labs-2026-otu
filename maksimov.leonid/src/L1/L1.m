@@ -31,13 +31,15 @@ Wsym = { K/s, ...
          K*(T*s + 1), ...
          K*(T*s + 1)/s };
 
+U_step    = laplace(heaviside(t), t, s);
+U_impulse = laplace(dirac(t), t, s);
+
 for n = 1:numel(names)
     W = Wsym{n};
 
-    U_step = laplace(heaviside(t), t, s);
     Y_step = simplify(W*U_step);
     h = ilaplace(Y_step, s, t);
-    U_impulse = laplace(dirac(t), t, s);
+
     Y_impulse = simplify(W*U_impulse);
     w = ilaplace(Y_impulse, s, t);
 
