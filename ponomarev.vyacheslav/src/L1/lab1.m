@@ -1,19 +1,23 @@
+
 syms s t K;
 
-%% Параметры
+%% Параметры варианта
 
-T = sym(1);
-T2 = sym(1);
-aperiodicT1 = sym(3);
-oscillatoryT1 = sym(7) / 10;
+variantGain = sym('1.9');
+timeConstant = sym('0.7');
+firstCoefficient = sym('1.1');
+secondCoefficient = sym('1.3');
 
-gainValues = 1:10;
-time = 0:0.01:10;
+aperiodicFirstCoefficient = sym('3');
+
+time = 0:0.01:20;
+impulseTime = 0:0.001:2;
+epsilon = 0.05;
 
 %% Входные воздействия
 
-U_step = laplace(heaviside(t), t, s);
-U_impulse = laplace(dirac(t), t, s);
+stepInput = laplace(heaviside(t), t, s);
+impulseInput = laplace(dirac(t), t, s);
 
 %% Передаточные функции
 
@@ -32,29 +36,31 @@ linkNames = {
 };
 
 transferFunctions = {
-    K / s;
-    K * s;
+    K/s;
+    K*s;
     K;
-    K / (T * s + 1);
-    K / (T2^2 * s^2 + aperiodicT1 * s + 1);
-    K / (T2^2 * s^2 + oscillatoryT1 * s + 1);
-    K / (T * s^2 + 1);
-    K / (s * (T * s + 1));
-    K * s / (T * s + 1);
-    K * (T * s + 1);
-    K * (T * s + 1) / s
+    K/(timeConstant*s + 1);
+    K/(secondCoefficient^2*s^2 + aperiodicFirstCoefficient*s + 1);
+    K/(secondCoefficient^2*s^2 + firstCoefficient*s + 1);
+    K/(timeConstant*s^2 + 1);
+    K/(s*(timeConstant*s + 1));
+    K*s/(timeConstant*s + 1);
+    K*(timeConstant*s + 1);
+    K*(timeConstant*s + 1)/s
 };
+
+filterOrders = [0, 2, 1, 0, 0, 0, 0, 0, 1, 2, 1];
 
 %% Аналитические вычисления
 
 for linkIndex = 1:numel(transferFunctions)
 
-    transferFunction = transferFunctions{linkIndex};
+    transferFunction = subs(transferFunctions{linkIndex}, K, variantGain);
 
-    stepOutput = simplify(transferFunction * U_step);
+    stepOutput = simplify(transferFunction * stepInput);
+    impulseOutput = simplify(transferFunction * impulseInput);
+
     stepResponse = simplify(ilaplace(stepOutput, s, t));
-
-    impulseOutput = simplify(transferFunction * U_impulse);
     impulseResponse = simplify(ilaplace(impulseOutput, s, t));
 
     fprintf('\n%d. %s\n', linkIndex, linkNames{linkIndex});
@@ -68,154 +74,171 @@ for linkIndex = 1:numel(transferFunctions)
     fprintf('w(t) = ');
     disp(impulseResponse);
 
-    %% Отделение импульсных составляющих
+    %% Определение импульсных составляющих
 
     [stepNumerator, stepDenominator] = numden(stepOutput);
-
     [stepPolynomial, ~] = quorem(stepNumerator, stepDenominator, s);
 
-    regularStep = simplify(ilaplace(stepOutput - stepPolynomial, s, t));
-
     [impulseNumerator, impulseDenominator] = numden(impulseOutput);
-
     [impulsePolynomial, ~] = quorem(impulseNumerator, impulseDenominator, s);
 
-    regularImpulse = simplify(ilaplace(impulseOutput - impulsePolynomial, s, t));
+    hasStepImpulse = ~isequal(stepPolynomial, sym(0));
+    hasImpulseImpulse = ~isequal(impulsePolynomial, sym(0));
 
-    stepFunction = matlabFunction(regularStep, 'Vars', [t, K]);
+    %% Приближённая модель
 
-    impulseFunction = matlabFunction(regularImpulse, 'Vars', [t, K]);
+    stepPlotTime = time;
+    impulsePlotTime = time;
 
-    %% Построение переходных характеристик
+    if hasStepImpulse || hasImpulseImpulse
+
+        [numerator, denominator] = numden(transferFunction);
+
+        originalModel = tf(sym2poly(numerator), sym2poly(denominator));
+
+        filterModel = tf([epsilon 1], 1);
+
+        approximateModel = originalModel / filterModel^filterOrders(linkIndex);
+
+    end
+
+    %% Переходная характеристика
+
+    if hasStepImpulse
+
+        stepPlotTime = impulseTime;
+        stepValues = squeeze(step(approximateModel, stepPlotTime));
+
+    else
+
+        regularStep = simplify(ilaplace(stepOutput, s, t));
+        stepFunction = matlabFunction(regularStep, 'Vars', t);
+
+        stepValues = real(double(stepFunction(stepPlotTime)));
+
+        if isscalar(stepValues)
+            stepValues = stepValues * ones(size(stepPlotTime));
+        end
+
+    end
+
+    %% Импульсная характеристика
+
+    if hasImpulseImpulse
+
+        impulsePlotTime = impulseTime;
+        impulseValues = squeeze(impulse(approximateModel, impulsePlotTime));
+
+    else
+
+        regularImpulse = simplify(ilaplace(impulseOutput, s, t));
+        impulseFunction = matlabFunction(regularImpulse, 'Vars', t);
+
+        impulseValues = real(double(impulseFunction(impulsePlotTime)));
+
+        if isscalar(impulseValues)
+            impulseValues = impulseValues * ones(size(impulsePlotTime));
+        end
+
+    end
+
+    %% Построение графиков
 
     figure('Name', linkNames{linkIndex}, 'NumberTitle', 'off');
 
     subplot(1, 2, 1);
-    hold on;
+
+    plot(stepPlotTime, stepValues, 'LineWidth', 1.5);
     grid on;
-
-    for gain = gainValues
-
-        response = real(double(stepFunction(time, gain)));
-
-        if isscalar(response)
-            response = response * ones(size(time));
-        end
-
-        plot(time, response, 'DisplayName', ['K = ', num2str(gain)]);
-
-    end
 
     title('Переходная характеристика h(t)');
     xlabel('Время t, с');
     ylabel('h(t)');
 
-    if ~isequal(stepPolynomial, sym(0))
-        text(0.03, 0.9, 'Импульсная составляющая при t = 0 не показана', 'Units', 'normalized', 'FontSize', 8);
+    if hasStepImpulse
+        subtitle('Аппроксимация импульсной составляющей');
     end
-
-    legend('show', 'Location', 'best');
-    hold off;
-
-    %% Построение импульсных характеристик
 
     subplot(1, 2, 2);
-    hold on;
+
+    plot(impulsePlotTime, impulseValues, 'LineWidth', 1.5);
     grid on;
-
-    for gain = gainValues
-
-        response = real(double(impulseFunction(time, gain)));
-
-        if isscalar(response)
-            response = response * ones(size(time));
-        end
-
-        plot(time, response, 'DisplayName', ['K = ', num2str(gain)]);
-
-    end
 
     title('Импульсная характеристика w(t)');
     xlabel('Время t, с');
     ylabel('w(t)');
 
-    if ~isequal(impulsePolynomial, sym(0))
-        text(0.03, 0.9, 'Импульсная составляющая при t = 0 не показана', 'Units', 'normalized', 'FontSize', 8);
+    if hasImpulseImpulse
+        subtitle('Аппроксимация импульсной составляющей');
     end
-
-    legend('show', 'Location', 'best');
-    hold off;
 
     sgtitle(sprintf('%d. %s', linkIndex, linkNames{linkIndex}));
 
 end
 
-%% Проверка через Control System Toolbox
+%% Проверка интегрирующего звена
 
-s_tf = tf('s');
+integratingModel = tf(double(variantGain), [1 0]);
 
 figure('Name', 'Проверка интегрирующего звена', 'NumberTitle', 'off');
 
 subplot(1, 2, 1);
-hold on;
+
+step(integratingModel, time);
 grid on;
-
-for gain = gainValues
-
-    transferFunctionCheck = gain / s_tf;
-    response = squeeze(step(transferFunctionCheck, time));
-
-    plot(time, response, 'DisplayName', ['K = ', num2str(gain)]);
-
-end
 
 title('Проверка h(t) через step');
 xlabel('Время t, с');
 ylabel('h(t)');
-legend('show', 'Location', 'northwest');
-hold off;
 
 subplot(1, 2, 2);
-hold on;
+
+impulse(integratingModel, time);
 grid on;
-
-for gain = gainValues
-
-    transferFunctionCheck = gain / s_tf;
-    response = squeeze(impulse(transferFunctionCheck, time));
-
-    plot(time, response, 'DisplayName', ['K = ', num2str(gain)]);
-
-end
 
 title('Проверка w(t) через impulse');
 xlabel('Время t, с');
 ylabel('w(t)');
-legend('show', 'Location', 'best');
-hold off;
 
-%% Влияние постоянной времени T
+%% Исследование влияния K
 
-fixedGain = 2;
-experimentTime = 0:0.01:30;
-timeConstantValues = [0.2, 0.5, 1, 2, 5];
+gainValues = double(variantGain) * [0.5, 1, 2];
 
-figure('Name', 'Влияние T', 'NumberTitle', 'off');
+figure('Name', 'Влияние K', 'NumberTitle', 'off');
+
 hold on;
 grid on;
 
-for timeConstant = timeConstantValues
+for currentGain = gainValues
 
-    transferFunction = K / (sym(timeConstant) * s + 1);
+    response = currentGain * (1 - exp(-time / double(timeConstant)));
 
-    stepOutput = transferFunction * U_step;
-    stepResponse = ilaplace(stepOutput, s, t);
+    plot(time, response, 'LineWidth', 1.5, 'DisplayName', ['K = ', num2str(currentGain)]);
 
-    responseFunction = matlabFunction(subs(stepResponse, K, fixedGain), 'Vars', t);
+end
 
-    response = real(double(responseFunction(experimentTime)));
+title('Влияние K на апериодическое звено');
+xlabel('Время t, с');
+ylabel('h(t)');
+legend('show', 'Location', 'southeast');
+hold off;
 
-    plot(experimentTime, response, 'DisplayName', ['T = ', num2str(timeConstant)]);
+%% Исследование влияния T
+
+timeConstantValues = double(timeConstant) * [1/5, 1/2, 1, 2, 5];
+
+experimentTime = 0:0.01:25;
+
+figure('Name', 'Влияние T', 'NumberTitle', 'off');
+
+hold on;
+grid on;
+
+for currentTimeConstant = timeConstantValues
+
+    response = double(variantGain) * (1 - exp(-experimentTime / currentTimeConstant));
+
+    plot(experimentTime, response, 'LineWidth', 1.5, 'DisplayName', ['T = ', num2str(currentTimeConstant)]);
 
 end
 
@@ -225,31 +248,59 @@ ylabel('h(t)');
 legend('show', 'Location', 'southeast');
 hold off;
 
-%% Влияние T1 на колебательное звено
+%% Исследование влияния T1
 
-dampingValues = [1.5, 1, 0.5, 0.1];
+firstCoefficientValues = double(firstCoefficient) * [1, 0.75, 0.5, 0.25];
+
+oscillationTime = 0:0.02:80;
+
+overshootValues = zeros(size(firstCoefficientValues));
+settlingTimeValues = zeros(size(firstCoefficientValues));
 
 figure('Name', 'Влияние T1', 'NumberTitle', 'off');
+
 hold on;
 grid on;
 
-for dampingCoefficient = dampingValues
+for coefficientIndex = 1:numel(firstCoefficientValues)
 
-    transferFunction = K / (T2^2 * s^2 + sym(dampingCoefficient) * s + 1);
+    currentFirstCoefficient = firstCoefficientValues(coefficientIndex);
 
-    stepOutput = transferFunction * U_step;
-    stepResponse = ilaplace(stepOutput, s, t);
+    transferFunction = variantGain / (secondCoefficient^2*s^2 + sym(num2str(currentFirstCoefficient, 16))*s + 1);
 
-    responseFunction = matlabFunction(subs(stepResponse, K, fixedGain), 'Vars', t);
+    stepOutput = transferFunction * stepInput;
+    stepResponse = simplify(ilaplace(stepOutput, s, t));
 
-    response = real(double(responseFunction(experimentTime)));
+    responseFunction = matlabFunction(stepResponse, 'Vars', t);
 
-    plot(experimentTime, response,'DisplayName', ['T1 = ', num2str(dampingCoefficient)]);
+    response = real(double(responseFunction(oscillationTime)));
+
+    plot(oscillationTime, response, 'LineWidth', 1.5, 'DisplayName', ['T1 = ', num2str(currentFirstCoefficient)]);
+
+    model = tf(double(variantGain), [double(secondCoefficient)^2, currentFirstCoefficient, 1]);
+
+    characteristics = stepinfo(model, 'SettlingTimeThreshold', 0.02);
+
+    overshootValues(coefficientIndex) = characteristics.Overshoot;
+
+    settlingTimeValues(coefficientIndex) = characteristics.SettlingTime;
 
 end
 
-title('Колебательное звено: влияние T1 при T2 = 1');
+title('Колебательное звено: влияние T1');
 xlabel('Время t, с');
 ylabel('h(t)');
 legend('show', 'Location', 'best');
 hold off;
+
+%% Результаты исследования T1
+
+fprintf('\nИсследование колебательного звена:\n');
+
+fprintf('K = %.1f, T2 = %.1f\n', double(variantGain), double(secondCoefficient));
+
+for coefficientIndex = 1:numel(firstCoefficientValues)
+
+    fprintf('T1 = %.4f: перерегулирование = %.2f%%, время установления = %.2f с\n', firstCoefficientValues(coefficientIndex), overshootValues(coefficientIndex), settlingTimeValues(coefficientIndex));
+
+end
