@@ -67,7 +67,6 @@ for j = 1:2
     sgtitle(figureNames{j});
 end
 
-
 figure('Name', 'Влияние K', 'NumberTitle', 'off');
 tiledlayout(1, 2);
 scale = [0.5 1 2];
