@@ -2,342 +2,232 @@ clear;
 clc;
 close all;
 
-K = 1.8;
+K0 = 1.8;
 T = 0.6;
 T1 = 0.9;
 T2 = 1.2;
-T11 = 3.0; %чтобы w5 и w6 не были одинаковыми
+T11 = 3.0; %чтобы модели 5 и 6 отличались
 
-s = tf('s');
+K_values = [0.9, 1.8, 3.6];
+time = 0:0.01:10;
+time_check = linspace(0, 10, 1000);
+time_long = linspace(0, 40, 1500);
+T_values = [T/5, T/2, T, 2*T, 5*T];
+T1_values = [T1, T1/2, T1/5, 0];
 
+syms p t K real
+s_tf = tf('s');
 
-W1 = K / s;
-
-W2 = K * s;
-
-W3 = K;
-
-W4 = K / (T*s + 1);
-
-W5 = K / (T2^2*s^2 + T11*s + 1);
-
-W6 = K / (T2^2*s^2 + T1*s + 1);
-
-W7 = K / (T*s^2 + 1);
-
-W8 = K / (s*(T*s + 1));
-
-W9 = K*s / (T*s + 1);
-
-W10 = K * (T*s + 1);
-
-W11 = K * (T*s + 1) / s;
-
-
-disp('Исходные параметры:');
-fprintf('K = %.2f, T = %.2f, T1 = %.2f, T2 = %.2f\n', K, T, T1, T2);
-
-disp('Передаточные функции:');
-
-for i = 1:11
-    fprintf('\nЗвено №%d:\n', i);
-    eval(['W = W' num2str(i) ';']);
-    disp(W);
-end
-
-if T11 >= 2*T2
-    disp('Звено №5: апериодическое второго порядка');
-else
-    disp('Звено №5: колебательное');
-end
-
-if T1 >= 2*T2
-    disp('Звено №6: апериодическое второго порядка');
-else
-    disp('Звено №6: колебательное');
-end
-
-
-syms p tau k real
-
-Ws = {
-    k/p, ...
-    k*p, ...
-    k, ...
-    k/(T*p + 1), ...
-    k/(T2^2*p^2 + T11*p + 1), ...
-    k/(T2^2*p^2 + T1*p + 1), ...
-    k/(T*p^2 + 1), ...
-    k/(p*(T*p + 1)), ...
-    k*p/(T*p + 1), ...
-    k*(T*p + 1), ...
-    k*(T*p + 1)/p
+names = {
+    'Интегрирующее'
+    'Идеальное дифференцирующее'
+    'Усилительное'
+    'Апериодическое 1-го порядка'
+    'Апериодическое 2-го порядка'
+    'Колебательное'
+    'Консервативное'
+    'Инерционное интегрирующее'
+    'Реальное дифференцирующее'
+    'Форсирующее'
+    'Изодромное'
 };
 
-U_step = 1/p;
-U_impulse = 1;
+n = numel(names);
 
-Y_step = cell(11,1);
-Y_impulse = cell(11,1);
-h = cell(11,1);
-w = cell(11,1);
+W = {
+    K/p
+    K*p
+    K
+    K/(T*p + 1)
+    K/(T2^2*p^2 + T11*p + 1)
+    K/(T2^2*p^2 + T1*p + 1)
+    K/(T*p^2 + 1)
+    K/(p*(T*p + 1))
+    K*p/(T*p + 1)
+    K*(T*p + 1)
+    K*(T*p + 1)/p
+};
 
-for i = 1:11
+Wtf = cell(n, 1);
 
-    Y_step{i} = simplify(Ws{i} * U_step);
+for i = 1:n
+    expression = subs(W{i}, K, K0);
+    [numerator, denominator] = numden(expression);
 
-    Y_impulse{i} = simplify(Ws{i} * U_impulse);
+    numerator_coefficients = double(sym2poly(expand(numerator)));
+    denominator_coefficients = double(sym2poly(expand(denominator)));
 
-    h{i} = simplify(ilaplace(Y_step{i}, p, tau));
-    w{i} = simplify(ilaplace(Y_impulse{i}, p, tau));
-
-    fprintf('\n====================================\n');
-    fprintf('ЗВЕНО №%d\n', i);
-    fprintf('====================================\n');
-
-    fprintf('W(s) = \n');
-    disp(Ws{i});
-
-    fprintf('Y_step(s) = \n');
-    disp(Y_step{i});
-
-    fprintf('h(t) = \n');
-    disp(h{i});
-
-    fprintf('Y_impulse(s) = \n');
-    disp(Y_impulse{i});
-
-    fprintf('w(t) = \n');
-    disp(w{i});
-
+    Wtf{i} = tf(numerator_coefficients, denominator_coefficients);
 end
 
+fprintf('K = %.2f, T = %.2f, T1 = %.2f, T2 = %.2f, T11 = %.2f\n', ...
+    K0, T, T1, T2, T11);
 
-K_values = [0.9 1.8 3.6];
+Y_step = cell(n, 1);
+Y_impulse = cell(n, 1);
+h = cell(n, 1);
+w = cell(n, 1);
+R = cell(n, 2);
 
-time = 0:0.01:10;
+for i = 1:n
+    Y_step{i} = simplify(W{i}/p);
+    Y_impulse{i} = simplify(W{i});
 
-names = {'Интегрирующее', ...
-    'Идеальное дифференцирующее', ...
-    'Усилительное', ...
-    'Апериодическое 1-го порядка', ...
-    'Апериодическое 2-го порядка', ...
-    'Колебательное', ...
-    'Консервативное', ...
-    'Инерционное интегрирующее', ...
-    'Реальное дифференцирующее', ...
-    'Форсирующее', ...
-    'Изодромное'};
+    h{i} = simplify(ilaplace(Y_step{i}, p, t));
+    w{i} = simplify(ilaplace(Y_impulse{i}, p, t));
 
-notes_h = cell(11,1);
-notes_w = cell(11,1);
+    R{i, 1} = simplify(subs(subs(subs( ...
+        h{i}, dirac(1, t), 0), dirac(t), 0), heaviside(t), 1));
 
-notes_h{2} = 'Содержит K*delta(t)';
-notes_h{10} = 'Содержит K*T*delta(t)';
+    R{i, 2} = simplify(subs(subs(subs( ...
+        w{i}, dirac(1, t), 0), dirac(t), 0), heaviside(t), 1));
 
-notes_w{2} = 'Содержит K*delta''(t)';
-notes_w{3} = 'Содержит K*delta(t)';
-notes_w{9} = 'Содержит импульсную составляющую';
-notes_w{10} = 'Содержит delta(t) и delta''(t)';
-notes_w{11} = 'Содержит K*T*delta(t)';
+    fprintf('\nЗвено №%d — %s\n', i, names{i});
+    fprintf('W(s) = %s\n', char(W{i}));
+    fprintf('h(t) = %s\n', char(h{i}));
+    fprintf('w(t) = %s\n', char(w{i}));
+end
+fprintf('\n');
 
-figure('Name','Переходные характеристики', ...
-    'Color','w','Position',[50 50 1450 900]);
+for mode = 1:2
+    if mode == 1
+        label = 'h(t)';
+        figure_name = 'Переходные характеристики';
+    else
+        label = 'w(t)';
+        figure_name = 'Импульсные характеристики';
+    end
 
-for i = 1:11
+    figure('Name', figure_name, 'Color', 'w', ...
+        'Position', [50, 50, 1450, 900]);
 
-    subplot(4,3,i);
-    hold on;
-    grid on;
+    for i = 1:n
+        subplot(4, 3, i);
+        hold on;
+        grid on;
 
-    for K_plot = K_values
+        singular = (mode == 1 && i == 2) || ...
+            (mode == 2 && ismember(i, [1, 2, 3, 10]));
 
-        expr = subs(h{i},k,K_plot);
-        expr = subs(expr,dirac(1,tau),0);
-        expr = subs(expr,dirac(tau),0);
-        expr = subs(expr,heaviside(tau),1);
+        if ~singular
+            for K_plot = K_values
+                expression = subs(R{i, mode}, K, K_plot);
+                response = double(subs(expression, t, time));
 
-        f = matlabFunction(expr,'Vars',tau);
-        y = f(time);
+                if isscalar(response)
+                    response = repmat(response, size(time));
+                end
 
-        if isscalar(y)
-            y = repmat(y,size(time));
+                plot(time, response, 'LineWidth', 1.3, ...
+                    'DisplayName', sprintf('K = %.1f', K_plot));
+            end
         end
 
-        plot(time,y,'LineWidth',1.3, ...
-            'DisplayName',sprintf('K = %.1f',K_plot));
-    end
+        title(sprintf('%d. %s', i, names{i}), 'FontSize', 9);
+        xlabel('Время, с');
+        ylabel(label);
 
-    title(sprintf('%d. %s',i,names{i}));
-    xlabel('Время, с');
-    ylabel('h(t)');
-
-    if ~isempty(notes_h{i})
-        text(0.05,0.90,notes_h{i}, ...
-            'Units','normalized','FontSize',8);
-    end
-
-    if i == 1
-        legend('show','Location','best');
-    end
-end
-
-sgtitle('Переходные характеристики динамических звеньев');
-
-figure('Name','Импульсные характеристики', ...
-    'Color','w','Position',[50 50 1450 900]);
-
-for i = 1:11
-    subplot(4, 3, i);
-    hold on;
-    grid on;
-
-    for K_plot = K_values
-        expr = subs(w{i}, k, K_plot);
-
-        expr = subs(expr, dirac(1, tau), 0);
-        expr = subs(expr, dirac(tau), 0);
-
-        expr = subs(expr, heaviside(tau), 1);
-
-        f = matlabFunction(expr, 'Vars', tau);
-
-        y = f(time);
-
-        if isscalar(y)
-            y = repmat(y, size(time));
+        if mode == 1 && i == 2
+            text(0.08, 0.85, 'K\delta(t)', ...
+                'Units', 'normalized', 'FontSize', 8);
+        elseif mode == 2 && i == 2
+            text(0.08, 0.85, 'K\delta''(t)', ...
+                'Units', 'normalized', 'FontSize', 8);
+        elseif mode == 2 && i == 3
+            text(0.08, 0.85, 'K\delta(t)', ...
+                'Units', 'normalized', 'FontSize', 8);
+        elseif mode == 2 && i == 9
+            text(0.08, 0.85, '+ (K/T)\delta(t)', ...
+                'Units', 'normalized', 'FontSize', 8);
+        elseif mode == 2 && i == 11
+            text(0.08, 0.85, '+ KT\delta(t)', ...
+                'Units', 'normalized', 'FontSize', 8);
         end
 
-        plot(time, y, 'LineWidth', 1.3, ...
-            'DisplayName', sprintf('K = %.1f', K_plot));
+        if i == 1
+            legend('show', 'Location', 'best');
+        end
+
+        hold off;
     end
 
-    title(sprintf('Звено №%d', i));
-    xlabel('Время t');
-    ylabel('w(t)');
-
-    if i == 1
-        legend('show', 'Location', 'best');
-    end
-
-    hold off;
+    sgtitle(figure_name);
 end
 
-sgtitle('Импульсные характеристики динамических звеньев');
-
-Wtf = {W1, W2, W3, W4, W5, W6, W7, W8, W9, W10, W11};
-
-time_check = linspace(0, 10, 1000);
-step_check = [1 3 4 5 6 7 8 9 11];
-
-fprintf('\nПРОВЕРКА ПЕРЕХОДНЫХ ХАРАКТЕРИСТИК\n');
+step_check = [1, 3, 4, 5, 6, 7, 8, 9, 11];
 
 for i = step_check
+    expression = subs(R{i, 1}, K, K0);
+    analytic_response = double(subs(expression, t, time_check));
+    analytic_response = analytic_response(:);
 
-    if i == 3
-        y_analytic = K * ones(size(time_check));
-        y_matlab = K * ones(size(time_check));
+    matlab_response = step(Wtf{i}, time_check);
+    matlab_response = squeeze(matlab_response);
+    matlab_response = matlab_response(:);
 
-        error_value = max(abs(y_matlab - y_analytic));
-
-        fprintf('Звено №3: ошибка = %.10e\n', error_value);
+    if numel(matlab_response) ~= numel(analytic_response)
+        fprintf('h%d: размер\n', i);
         continue;
     end
 
-    expr = subs(h{i}, k, K);
-    expr = subs(expr, dirac(1, tau), 0);
-    expr = subs(expr, dirac(tau), 0);
-    expr = subs(expr, heaviside(tau), 1);
-
-    f = matlabFunction(expr, 'Vars', tau);
-    y_analytic = f(time_check);
-    y_analytic = y_analytic(:);
-
-    y_matlab = step(Wtf{i}, time_check);
-    y_matlab = squeeze(y_matlab);
-    y_matlab = y_matlab(:);
-
-    if numel(y_matlab) ~= numel(y_analytic)
-        fprintf('Звено №%d: несовпадение размеров массивов\n', i);
-        continue;
-    end
-
-    error_value = max(abs(y_matlab - y_analytic));
-
-    fprintf('Звено №%d: ошибка = %.10e\n', i, error_value);
-
+    error_value = max(abs(matlab_response - analytic_response));
+    fprintf('h%d: %.3e\n', i, error_value);
 end
 
-impulse_check = [1 4 5 6 7 8];
-
-fprintf('\nПРОВЕРКА ИМПУЛЬСНЫХ ХАРАКТЕРИСТИК\n');
+impulse_check = [4, 5, 6, 7, 8, 9, 11];
 
 for i = impulse_check
+    expression = subs(R{i, 2}, K, K0);
+    analytic_response = double(subs(expression, t, time_check));
 
-    expr = subs(w{i}, k, K);
-    expr = subs(expr, dirac(1, tau), 0);
-    expr = subs(expr, dirac(tau), 0);
-    expr = subs(expr, heaviside(tau), 1);
-
-    f = matlabFunction(expr, 'Vars', tau);
-    y_analytic = f(time_check);
-
-    if isscalar(y_analytic)
-        y_analytic = repmat(y_analytic, size(time_check));
+    if isscalar(analytic_response)
+        analytic_response = repmat(analytic_response, size(time_check));
     end
 
-    y_matlab = impulse(Wtf{i}, time_check);
+    if i == 9
+        model = -(K0/T)/(T*s_tf + 1);
+    elseif i == 11
+        model = K0/s_tf;
+    else
+        model = Wtf{i};
+    end
 
-    error_value = max(abs(y_matlab(:) - y_analytic(:)));
+    matlab_response = impulse(model, time_check);
+    error_value = max(abs(matlab_response(:) - analytic_response(:)));
 
-    fprintf('Звено №%d: ошибка = %.10e\n', i, error_value);
-
+    fprintf('w%d: %.3e\n', i, error_value);
 end
 
-K_fixed = K;
-T_values = [0.12 0.3 0.6 1.2 3.0];
-
-time_T = linspace(0, 15, 1500);
-
-figure('Name', 'Влияние T на переходную характеристику');
-
+figure('Name', 'Влияние T', 'Color', 'w');
 hold on;
 grid on;
 
 for T_plot = T_values
+    model = K0/(T_plot*s_tf + 1);
 
-    h_T = K_fixed * (1 - exp(-time_T / T_plot));
-
-    plot(time_T, h_T, 'LineWidth', 1.5, ...
+    plot(time, step(model, time), 'LineWidth', 1.3, ...
         'DisplayName', sprintf('T = %.2f', T_plot));
-
 end
 
-title('Влияние постоянной времени T на h(t)');
-xlabel('Время t');
+title('Влияние T');
+xlabel('Время, с');
 ylabel('h(t)');
 legend('show', 'Location', 'best');
-
 hold off;
 
-
-figure('Name', 'Влияние T на импульсную характеристику');
-
+figure('Name', 'Влияние T1', 'Color', 'w');
 hold on;
 grid on;
 
-for T_plot = T_values
+for T1_plot = T1_values
+    model = K0/(T2^2*s_tf^2 + T1_plot*s_tf + 1);
 
-    w_T = (K_fixed / T_plot) * exp(-time_T / T_plot);
-
-    plot(time_T, w_T, 'LineWidth', 1.5, ...
-        'DisplayName', sprintf('T = %.2f', T_plot));
-
+    plot(time_long, step(model, time_long), 'LineWidth', 1.3, ...
+        'DisplayName', sprintf('T1 = %.2f', T1_plot));
 end
 
-title('Влияние постоянной времени T на w(t)');
-xlabel('Время t');
-ylabel('w(t)');
+title('Влияние T1');
+xlabel('Время, с');
+ylabel('h(t)');
 legend('show', 'Location', 'best');
-
 hold off;
