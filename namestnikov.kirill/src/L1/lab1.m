@@ -104,4 +104,3 @@ for j = 1:3
     legend('Location','eastoutside');
     print(fig,fullfile(out,[tags{j} '.png']),'-dpng',sprintf('-r%d',dpi));
 end
-
