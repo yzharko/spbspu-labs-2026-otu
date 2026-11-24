@@ -22,8 +22,7 @@ k = sym(K,'r'); tau = sym(T,'r'); a = sym(T1,'r'); b = sym(T2,'r');
 W = {k/s,k*s,k,k/(tau*s+1),k/(b^2*s^2+sym(T1a,'r')*s+1),...
     k/(b^2*s^2+a*s+1),k/(tau*s^2+1),k/(s*(tau*s+1)),...
     k*s/(tau*s+1),k*(tau*s+1),k*(tau*s+1)/s};
-% Полиномиальная часть образа даёт дельта-функцию и её производные.
-% Для строго правильного остатка impulse даёт регулярную часть как h, так и w.
+
 labels = {'h','w'};
 for mode = 1:2
     for group = 1:2
@@ -105,3 +104,4 @@ for j = 1:3
     legend('Location','eastoutside');
     print(fig,fullfile(out,[tags{j} '.png']),'-dpng',sprintf('-r%d',dpi));
 end
+
