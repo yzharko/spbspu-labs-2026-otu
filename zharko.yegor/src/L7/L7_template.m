@@ -30,7 +30,7 @@ disp('W(s) (tf) = '); disp(W_tf);
 
 [ya_num, ya_dem] = ss2tf(A_new, B_new, C_new, 0);
 ya_W_tf = tf(ya_num, ya_dem);
-disp('ya W(s) (tf) = '); disp(ya_W_tf);
+disp('ya_W(s) (tf) = '); disp(ya_W_tf);
 fprintf('Передаточная функция новой модели совпадает: %s\n', ...
     mat2str(all(abs(num-ya_num) < 1e-9) && all(abs(den-ya_dem) < 1e-9)));
 
@@ -39,14 +39,14 @@ t = 0:0.01:10;
 sys_old = ss(A, B, C, 0);
 sys_new = ss(A_new, B_new, C_new, 0);
 
-[y1, ~] = step(sys_old, t);
-[y2, ~] = step(sys_new, t);
-[y3, ~] = step(W_tf, t);
+[y_old, ~] = step(sys_old, t);
+[y_new, ~] = step(sys_new, t);
+[y_tf, ~] = step(W_tf, t);
 
 figure('Name','Переходные процессы (3 способа)','Color','w');
-plot(t, y1, 'r-', 'LineWidth', 1.5); hold on;
-plot(t, y2, 'b--', 'LineWidth', 1.5);
-plot(t, y3, 'g:', 'LineWidth', 2);
+plot(t, y_old, 'r-', 'LineWidth', 1.5); hold on;
+plot(t, y_new, 'b--', 'LineWidth', 1.5);
+plot(t, y_tf, 'g:', 'LineWidth', 2);
 grid on; xlabel('t, с'); ylabel('y(t)');
 title('Переходной процесс при единичном ступенчатом воздействии');
 legend('По исходной модели (A,B,C)','По модели в новом базисе','По передаточной функции W(s)','Location','southeast');
@@ -55,13 +55,13 @@ legend('По исходной модели (A,B,C)','По модели в нов
 U = ctrb(A, B);
 rank_U = rank(U);
 fprintf('\nМатрица управляемости Uc =\n'); disp(U);
-fprintf('rank(Uc) = %d при n = %d -> система %s\n', rank_U, n, ...
+fprintf('rank(U) = %d при n = %d -> система %s\n', rank_U, n, ...
     char(ternary(rank_U == n, "управляема", "НЕ управляема")));
 
 N = obsv(A, C);
 rank_N = rank(N);
 fprintf('\nМатрица наблюдаемости Uo =\n'); disp(N);
-fprintf('rank(Uo) = %d при n = %d -> система %s\n', rank_N, n, ...
+fprintf('rank(N) = %d при n = %d -> система %s\n', rank_N, n, ...
     char(ternary(rank_N == n, "наблюдаема", "НЕ наблюдаема")));
 
 function out = ternary(cond, a, b)
