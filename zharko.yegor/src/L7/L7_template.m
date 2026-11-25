@@ -54,13 +54,13 @@ legend('По исходной модели (A,B,C)','По модели в нов
 %% 5. Управляемость и Наблюдаемость
 U = ctrb(A, B);
 rank_U = rank(U);
-fprintf('\nМатрица управляемости Uc =\n'); disp(U);
+fprintf('\nМатрица управляемости U =\n'); disp(U);
 fprintf('rank(U) = %d при n = %d -> система %s\n', rank_U, n, ...
     char(ternary(rank_U == n, "управляема", "НЕ управляема")));
 
 N = obsv(A, C);
 rank_N = rank(N);
-fprintf('\nМатрица наблюдаемости Uo =\n'); disp(N);
+fprintf('\nМатрица наблюдаемости N =\n'); disp(N);
 fprintf('rank(N) = %d при n = %d -> система %s\n', rank_N, n, ...
     char(ternary(rank_N == n, "наблюдаема", "НЕ наблюдаема")));
 
